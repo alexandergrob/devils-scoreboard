@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="board.css">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  #wrap { position: absolute; top: 0; left: 0; transform-origin: 0 0; padding: 6px 12px 32px 6px; visibility: hidden; }
+  #msg {
+    position: absolute; top: 6px; left: 6px; display: none; max-width: 90vw;
+    font: 15px/1.4 Arial, sans-serif; color: #fff; background: #a32020; padding: 8px 12px; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="msg"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  var wrap = document.getElementById('wrap'), msg = document.getElementById('msg');
+  wrap.innerHTML = SB.boardHTML;
+  var root = wrap.firstElementChild;
+  var S = null;
+  // Add ?fit=0 to the link to stop the board stretching to the width of the layer
+  var fitWidth = new URLSearchParams(location.search).get('fit') !== '0';
+
+  function showMsg(t) { msg.textContent = t; msg.style.display = 'block'; }
+  function hideMsg() { msg.style.display = 'none'; }
+
+  var key = SB.boardKey();
+  if (!key) { showMsg('Missing board link. Copy the display link from the control page.'); return; }
+  var db = SB.initFirebase(showMsg);
+  if (!db) return;
+
+  db.ref('boards/' + key).on('value', function (snap) {
+    S = snap.val();
+    if (!S) { showMsg('Board not found. Open the control page first, then use its display link.'); wrap.style.visibility = 'hidden'; }
+    else { hideMsg(); }
+  }, function (err) { showMsg('Cannot read the board: ' + err.message); });
+
+  var lastW = 0;
+  function fit() {
+    if (!fitWidth) { wrap.style.transform = ''; return; }
+    var w = wrap.offsetWidth;
+    if (!w) return;
+    if (w !== lastW || window.innerWidth !== fit.vw) {
+      lastW = w; fit.vw = window.innerWidth;
+      wrap.style.transform = 'scale(' + (window.innerWidth / w) + ')';
+    }
+  }
+  window.addEventListener('resize', function () { lastW = 0; fit(); });
+
+  setInterval(function () {
+    if (!S) return;
+    SB.renderBoard(root, S, SB.live(S, SB.serverNow()));
+    wrap.style.visibility = 'visible';
+    fit();
+  }, 100);
+})();
+</script>
+</body>
+</html>

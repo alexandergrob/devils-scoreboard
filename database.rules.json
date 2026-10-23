@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "boards": {
+      "$board": {
+        ".read": "$board.length >= 16",
+        ".write": "$board.length >= 16"
+      }
+    }
+  }
+}

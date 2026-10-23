@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="board.css">
+<style>
+  html, body { margin: 0; background: #121216; color: #eee; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; }
+  .page { max-width: 960px; margin: 0 auto; padding: 16px; box-sizing: border-box; }
+  .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .top h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .status { font-size: 13px; padding: 4px 10px; border-radius: 20px; background: #3a1a1a; color: #ff8a8a; }
+  .status.on { background: #16331f; color: #7be29b; }
+  #err { display: none; background: #a32020; color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+  .preview { background: repeating-conic-gradient(#1d1d22 0% 25%, #24242a 0% 50%) 50% / 24px 24px; border-radius: 10px; padding: 14px 14px 38px; margin-bottom: 14px; overflow-x: auto; }
+  .panel { background: #1b1b1f; border-radius: 10px; padding: 14px 16px; box-sizing: border-box; }
+  .panel h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #9a9aa5; }
+  .panel section { padding: 12px 0; border-top: 1px solid #2c2c33; }
+  .panel section:first-child { border-top: 0; padding-top: 2px; }
+  .hint { color: #9a9aa5; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  button {
+    background: #2e2e36; color: #fff; border: 1px solid #44444f; border-radius: 6px;
+    padding: 9px 14px; font-size: 14px; cursor: pointer; touch-action: manipulation;
+  }
+  button:hover { background: #3a3a44; }
+  button.big { padding: 12px 22px; font-size: 16px; font-weight: 600; }
+  button.go { background: #1f7a3a; border-color: #2a9a4c; }
+  button.stop { background: #a32020; border-color: #c93030; }
+  button.active { outline: 2px solid #ffcf33; }
+  button.danger { background: #5a1a1a; border-color: #8a2a2a; }
+  input[type=text], input[type=number] {
+    background: #111; color: #fff; border: 1px solid #44444f; border-radius: 6px;
+    padding: 8px 9px; font-size: 14px; min-width: 0;
+  }
+  input[type=number] { width: 60px; }
+  input[type=color] { width: 40px; height: 36px; border: 0; background: none; padding: 0; cursor: pointer; }
+  input[type=file] { display: none; }
+  .link { flex: 1; min-width: 200px; font-family: Consolas, monospace; font-size: 12px; }
+  .pen { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .pen span { min-width: 200px; font-variant-numeric: tabular-nums; }
+  .muted { color: #777; }
+  .logoPrev { width: 36px; height: 36px; object-fit: contain; background: #111; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <h1>Scoreboard control</h1>
+    <span class="status" id="status">Connecting…</span>
+  </div>
+  <div id="err"></div>
+
+  <div class="preview" id="preview"></div>
+
+  <div class="panel">
+    <section>
+      <h3>Links</h3>
+      <div class="row">
+        <span style="width:70px">Display</span>
+        <input type="text" class="link" id="displayLink" readonly>
+        <button data-copy="displayLink">Copy</button>
+      </div>
+      <div class="row">
+        <span style="width:70px">Control</span>
+        <input type="text" class="link" id="controlLink" readonly>
+        <button data-copy="controlLink">Copy</button>
+      </div>
+      <div class="hint">Put the display link in Streamlabs Mobile (Add a URL). Bookmark the control link, or open it on another device to control the same board.</div>
+    </section>
+
+    <section>
+      <h3>Teams</h3>
+      <div class="two">
+        <div>
+          <div class="row"><label>Home <input type="text" id="homeName" maxlength="16" style="width:150px"></label><input type="color" id="homeColor" title="Home colour"></div>
+          <div class="row">
+            <img class="logoPrev" id="homeLogoPrev" alt="">
+            <button data-act="logoPick" data-team="home">Upload home logo</button>
+            <button data-act="logoClear" data-team="home">No logo</button>
+            <input type="file" id="homeLogoFile" accept="image/*">
+          </div>
+        </div>
+        <div>
+          <div class="row"><label>Away <input type="text" id="awayName" maxlength="16" style="width:150px"></label><input type="color" id="awayColor" title="Away colour"></div>
+          <div class="row">
+            <img class="logoPrev" id="awayLogoPrev" alt="">
+            <button data-act="logoPick" data-team="away">Upload away logo</button>
+            <button data-act="logoClear" data-team="away">No logo</button>
+            <input type="file" id="awayLogoFile" accept="image/*">
+          </div>
+        </div>
+      </div>
+      <div class="row"><span style="flex:1"></span><button data-act="swap">Swap home and away</button></div>
+    </section>
+
+    <section class="two">
+      <div>
+        <h3 id="homeHead">Home</h3>
+        <div class="row"><button class="big" data-act="goal" data-team="home" data-d="1">Goal +1</button><button data-act="goal" data-team="home" data-d="-1">Goal -1</button></div>
+        <div class="row"><button data-act="shot" data-team="home" data-d="1">Shot +1</button><button data-act="shot" data-team="home" data-d="-1">Shot -1</button><span class="muted" id="homeShotsCtl">Shots: 0</span></div>
+        <div class="row"><button data-act="pen" data-team="home" data-type="minor">Penalty 2 min</button><button data-act="pen" data-team="home" data-type="major">Penalty 5 min</button><button data-act="unpen" data-team="home">Remove penalty</button></div>
+      </div>
+      <div>
+        <h3 id="awayHead">Away</h3>
+        <div class="row"><button class="big" data-act="goal" data-team="away" data-d="1">Goal +1</button><button data-act="goal" data-team="away" data-d="-1">Goal -1</button></div>
+        <div class="row"><button data-act="shot" data-team="away" data-d="1">Shot +1</button><button data-act="shot" data-team="away" data-d="-1">Shot -1</button><span class="muted" id="awayShotsCtl">Shots: 0</span></div>
+        <div class="row"><button data-act="pen" data-team="away" data-type="minor">Penalty 2 min</button><button data-act="pen" data-team="away" data-type="major">Penalty 5 min</button><button data-act="unpen" data-team="away">Remove penalty</button></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Clock</h3>
+      <div class="row">
+        <button class="big go" id="startStop">Start</button>
+        <button data-act="nudge" data-d="-1000">-1 sec</button>
+        <button data-act="nudge" data-d="1000">+1 sec</button>
+        <button data-act="resetClock">Reset to full period</button>
+      </div>
+      <div class="row">
+        <input type="text" id="setClock" placeholder="mm:ss" size="6">
+        <button data-act="setClock">Set clock</button>
+        <label style="margin-left:12px">Period (min) <input type="number" id="periodLen" min="1" max="60"></label>
+        <label>OT (min) <input type="number" id="otLen" min="1" max="60"></label>
+      </div>
+      <div class="hint">Shortcuts: Space = start/stop, 1 = home goal, 2 = away goal, Q = home shot, W = away shot.</div>
+    </section>
+
+    <section>
+      <h3>Period</h3>
+      <div class="row" id="periodBtns">
+        <button data-act="period" data-p="1">1st</button>
+        <button data-act="period" data-p="2">2nd</button>
+        <button data-act="period" data-p="3">3rd</button>
+        <button data-act="period" data-p="OT">OT</button>
+        <button data-act="period" data-p="SO">SO</button>
+        <button data-act="period" data-p="INT">Intermission</button>
+        <button data-act="period" data-p="FINAL">Final</button>
+      </div>
+      <div class="hint">Changing period only changes the label. Press "Reset to full period" when the new period starts.</div>
+    </section>
+
+    <section>
+      <h3>Active penalties</h3>
+      <div id="penList"></div>
+      <div class="row"><label><input type="checkbox" id="autoPP"> End the earliest minor penalty when a power-play goal is scored</label></div>
+    </section>
+
+    <section>
+      <h3>Display</h3>
+      <div class="row">
+        <label><input type="checkbox" id="showShots"> Show shots on goal</label>
+        <label><input type="checkbox" id="goalShot"> Goals also add a shot</label>
+        <label><input type="checkbox" id="showLeague"> Show BUIHA logo</label>
+        <span style="flex:1"></span>
+        <button class="danger" id="resetGame">Reset game</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function showErr(t) { $('err').textContent = t; $('err').style.display = 'block'; }
+
+  $('preview').innerHTML = SB.boardHTML;
+  var board = $('preview').firstElementChild;
+
+  // ---------- board key (the secret part of the links) ----------
+  function genKey() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', out = '';
+    var arr = new Uint32Array(20);
+    (window.crypto || window.msCrypto).getRandomValues(arr);
+    for (var i = 0; i < arr.length; i++) out += chars[arr[i] % chars.length];
+    return out;
+  }
+  var key = SB.boardKey();
+  if (!key) {
+    try { key = localStorage.getItem('sbBoardKey') || ''; } catch (e) {}
+    if (!/^[A-Za-z0-9]{16,}$/.test(key)) key = genKey();
+    history.replaceState(null, '', location.pathname + '?board=' + key);
+  }
+  try { localStorage.setItem('sbBoardKey', key); } catch (e) {}
+  $('displayLink').value = new URL('display.html?board=' + key, location.href).href;
+  $('controlLink').value = location.href;
+
+  var db = SB.initFirebase(showErr);
+  if (!db) { $('status').textContent = 'Not connected'; return; }
+  var ref = db.ref('boards/' + key);
+
+  db.ref('.info/connected').on('value', function (s) {
+    var on = !!s.val();
+    $('status').textContent = on ? 'Connected' : 'Offline';
+    $('status').classList.toggle('on', on);
+  });
+
+  // ---------- state ----------
+  var S = null, inputsReady = false;
+  function fresh() {
+    var d = Object.assign({}, SB.DEFAULTS);
+    d.clock = { running: false, baseMs: d.periodLen * 60000, startedAt: 0 };
+    return d;
+  }
+  ref.on('value', function (snap) {
+    var v = snap.val();
+    if (!v) { ref.set(fresh()); return; }
+    S = Object.assign({}, SB.DEFAULTS, v);
+    if (!S.clock) S.clock = { running: false, baseMs: S.periodLen * 60000, startedAt: 0 };
+    syncInputs();
+    render();
+  }, function (err) { showErr('Cannot reach the board: ' + err.message); });
+
+  function fullPeriodMs() { return (S.period === 'OT' ? S.otLen : S.periodLen) * 60000; }
+
+  // Current clock and penalties, restarted from "now" so they can be edited and saved together
+  function snapshotNow() {
+    var now = SB.serverNow(), L = SB.live(S, now), pens = {};
+    L.pens.forEach(function (p) {
+      if (p.ms > 0) pens[p.id] = { team: p.team, type: p.type, added: p.added, baseMs: Math.round(p.ms) };
+    });
+    return { now: now, clock: { running: L.running && L.clockMs > 0, baseMs: Math.round(L.clockMs), startedAt: now }, pens: pens };
+  }
+  function timingUpdate(r, extra) {
+    var u = extra || {};
+    u.clock = r.clock;
+    u.pens = Object.keys(r.pens).length ? r.pens : null;
+    return u;
+  }
+  function save(u) { ref.update(u).catch(function (e) { showErr('Could not save: ' + e.message); }); }
+
+  // ---------- actions ----------
+  function goal(team, d) {
+    var before = S[team + 'Score'] || 0, after = Math.max(0, before + d);
+    if (after === before) return;
+    var u = {};
+    u[team + 'Score'] = after;
+    if (S.goalShot) u[team + 'Shots'] = Math.max(0, (S[team + 'Shots'] || 0) + d);
+    if (d > 0 && S.autoPP) {
+      var r = snapshotNow(), opp = team === 'home' ? 'away' : 'home';
+      var list = Object.keys(r.pens).map(function (id) { return Object.assign({ id: id }, r.pens[id]); });
+      var mine = list.filter(function (p) { return p.team === team; }).length;
+      var theirs = list.filter(function (p) { return p.team === opp; });
+      if (theirs.length > mine) {
+        var minors = theirs.filter(function (p) { return p.type === 'minor'; }).sort(function (a, b) { return a.baseMs - b.baseMs; });
+        if (minors.length) { delete r.pens[minors[0].id]; u = timingUpdate(r, u); }
+      }
+    }
+    save(u);
+  }
+  function shot(team, d) {
+    var u = {}; u[team + 'Shots'] = Math.max(0, (S[team + 'Shots'] || 0) + d); save(u);
+  }
+  function addPen(team, type) {
+    var r = snapshotNow();
+    var id = 'p' + r.now.toString(36) + Math.random().toString(36).slice(2, 6);
+    r.pens[id] = { team: team, type: type, added: r.now, baseMs: (type === 'minor' ? 2 : 5) * 60000 };
+    save(timingUpdate(r));
+  }
+  function toggleClock() {
+    if (!S) return;
+    var r = snapshotNow(), wasRunning = !!S.clock.running;
+    if (!wasRunning && r.clock.baseMs <= 0) return;
+    r.clock.running = !wasRunning;
+    save(timingUpdate(r));
+  }
+  function parseClock(v) {
+    v = v.trim();
+    var m = v.match(/^(\d{1,2}):(\d{2})(?:\.(\d))?$/);
+    if (m) return (+m[1] * 60 + +m[2]) * 1000 + (m[3] ? +m[3] * 100 : 0);
+    if (/^\d+(\.\d)?$/.test(v)) return parseFloat(v) * 1000;
+    return null;
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.copy) {
+      var inp = $(b.dataset.copy);
+      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(inp.value).then(done, function () { inp.select(); document.execCommand('copy'); done(); });
+      else { inp.select(); document.execCommand('copy'); done(); }
+      return;
+    }
+    if (!S) return;
+    var a = b.dataset.act, t = b.dataset.team, r;
+    if (a === 'goal') goal(t, +b.dataset.d);
+    else if (a === 'shot') shot(t, +b.dataset.d);
+    else if (a === 'pen') addPen(t, b.dataset.type);
+    else if (a === 'unpen') {
+      r = snapshotNow();
+      var last = null;
+      Object.keys(r.pens).forEach(function (id) { if (r.pens[id].team === t && (!last || r.pens[id].added >= r.pens[last].added)) last = id; });
+      if (last) { delete r.pens[last]; save(timingUpdate(r)); }
+    }
+    else if (a === 'rmpen') { r = snapshotNow(); delete r.pens[b.dataset.id]; save(timingUpdate(r)); }
+    else if (a === 'period') save({ period: b.dataset.p });
+    else if (a === 'nudge') { r = snapshotNow(); r.clock.baseMs = Math.max(0, Math.min(fullPeriodMs(), r.clock.baseMs + (+b.dataset.d))); save(timingUpdate(r)); }
+    else if (a === 'resetClock') { r = snapshotNow(); r.clock.running = false; r.clock.baseMs = fullPeriodMs(); save(timingUpdate(r)); }
+    else if (a === 'setClock') {
+      var ms = parseClock($('setClock').value);
+      if (ms === null) return;
+      r = snapshotNow(); r.clock.baseMs = ms; $('setClock').value = ''; save(timingUpdate(r));
+    }
+    else if (a === 'logoPick') $(t + 'LogoFile').click();
+    else if (a === 'logoClear') { var u0 = {}; u0[t + 'Logo'] = ''; save(u0); }
+    else if (a === 'swap') {
+      r = snapshotNow();
+      var u = {};
+      ['Name', 'Color', 'Logo', 'Score', 'Shots'].forEach(function (k) { u['home' + k] = S['away' + k]; u['away' + k] = S['home' + k]; });
+      Object.keys(r.pens).forEach(function (id) { r.pens[id].team = r.pens[id].team === 'home' ? 'away' : 'home'; });
+      save(timingUpdate(r, u));
+      inputsReady = false; // refresh the name and colour boxes
+    }
+    b.blur();
+  });
+
+  $('startStop').addEventListener('click', toggleClock);
+
+  var armed = null;
+  $('resetGame').addEventListener('click', function () {
+    var btn = $('resetGame');
+    if (!armed) {
+      btn.textContent = 'Click again to confirm';
+      armed = setTimeout(function () { armed = null; btn.textContent = 'Reset game'; }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = null; btn.textContent = 'Reset game';
+    save({
+      homeScore: 0, awayScore: 0, homeShots: 0, awayShots: 0, period: '1', pens: null,
+      clock: { running: false, baseMs: S.periodLen * 60000, startedAt: SB.serverNow() }
+    });
+  });
+
+  // logo upload, shrunk to 128px so it saves quickly
+  ['home', 'away'].forEach(function (t) {
+    $(t + 'LogoFile').addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var scale = Math.min(1, 128 / Math.max(img.width, img.height));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          var u = {}; u[t + 'Logo'] = c.toDataURL('image/png'); save(u);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+  });
+
+  // settings inputs
+  var textKeys = { homeName: 'homeName', awayName: 'awayName' };
+  var colorKeys = { homeColor: 'homeColor', awayColor: 'awayColor' };
+  var numKeys = { periodLen: 'periodLen', otLen: 'otLen' };
+  var checkKeys = { autoPP: 'autoPP', showShots: 'showShots', goalShot: 'goalShot', showLeague: 'showLeague' };
+  Object.keys(textKeys).forEach(function (id) {
+    $(id).addEventListener('input', function () { if (!S) return; var u = {}; u[id] = $(id).value.toUpperCase(); save(u); });
+  });
+  Object.keys(colorKeys).forEach(function (id) {
+    $(id).addEventListener('input', function () { if (!S) return; var u = {}; u[id] = $(id).value; save(u); });
+  });
+  Object.keys(numKeys).forEach(function (id) {
+    $(id).addEventListener('change', function () {
+      if (!S) return;
+      var n = parseInt($(id).value, 10);
+      if (n > 0 && n <= 60) { var u = {}; u[id] = n; save(u); } else $(id).value = S[id];
+    });
+  });
+  Object.keys(checkKeys).forEach(function (id) {
+    $(id).addEventListener('change', function () { if (!S) return; var u = {}; u[id] = $(id).checked; save(u); });
+  });
+
+  // keep inputs in step with the board (e.g. if changed from another device), without fighting typing
+  function syncInputs() {
+    var all = [].concat(Object.keys(textKeys), Object.keys(colorKeys), Object.keys(numKeys));
+    all.forEach(function (id) {
+      var el = $(id);
+      if (!inputsReady || document.activeElement !== el) { if (String(el.value) !== String(S[id])) el.value = S[id]; }
+    });
+    Object.keys(checkKeys).forEach(function (id) { $(id).checked = !!S[id]; });
+    inputsReady = true;
+  }
+
+  // keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    var tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || !S) return;
+    if (e.code === 'Space') { e.preventDefault(); toggleClock(); }
+    else if (e.key === '1') goal('home', 1);
+    else if (e.key === '2') goal('away', 1);
+    else if (e.key === 'q' || e.key === 'Q') shot('home', 1);
+    else if (e.key === 'w' || e.key === 'W') shot('away', 1);
+  });
+
+  // ---------- render ----------
+  var penKey = '';
+  function render() {
+    if (!S) return;
+    var L = SB.live(S, SB.serverNow());
+    SB.renderBoard(board, S, L);
+
+    ['home', 'away'].forEach(function (t) {
+      $(t + 'ShotsCtl').textContent = 'Shots: ' + (S[t + 'Shots'] || 0);
+      $(t + 'Head').textContent = S[t + 'Name'] || t;
+      var logo = S[t + 'Logo'] || '', prev = $(t + 'LogoPrev');
+      if (prev.getAttribute('src') !== logo) prev.setAttribute('src', logo);
+      prev.style.visibility = logo ? 'visible' : 'hidden';
+    });
+    var ss = $('startStop');
+    ss.textContent = L.running ? 'Stop' : 'Start';
+    ss.className = 'big ' + (L.running ? 'stop' : 'go');
+    Array.prototype.forEach.call(document.querySelectorAll('#periodBtns button'), function (b) {
+      b.classList.toggle('active', b.dataset.p === S.period);
+    });
+
+    // penalty list: rebuild only when penalties change, so Remove buttons stay clickable
+    var active = L.pens.filter(function (p) { return p.ms > 0; });
+    var k = active.map(function (p) { return p.id; }).join('|');
+    var list = $('penList');
+    if (k !== penKey) {
+      penKey = k;
+      list.innerHTML = '';
+      if (!active.length) { var none = document.createElement('div'); none.className = 'muted'; none.textContent = 'None'; list.appendChild(none); }
+      active.forEach(function (p) {
+        var row = document.createElement('div'); row.className = 'pen';
+        var span = document.createElement('span'); span.id = 'pen_' + p.id;
+        var btn = document.createElement('button'); btn.textContent = 'Remove'; btn.dataset.act = 'rmpen'; btn.dataset.id = p.id;
+        row.appendChild(span); row.appendChild(btn); list.appendChild(row);
+      });
+    }
+    active.forEach(function (p) {
+      var span = $('pen_' + p.id);
+      if (span) span.textContent = (S[p.team + 'Name'] || p.team) + ' ' + (p.type === 'minor' ? 'minor' : 'major') + '  ' + SB.fmtPen(p.ms);
+    });
+    return L;
+  }
+
+  // ---------- loop: redraw, stop the clock at 0:00, clear finished penalties ----------
+  var pending = false;
+  setInterval(function () {
+    var L = render();
+    if (!L || pending) return;
+    var expired = L.pens.some(function (p) { return p.ms <= 0; });
+    var periodOver = L.running && L.clockMs <= 0;
+    if (expired || periodOver) {
+      pending = true;
+      var r = snapshotNow();
+      if (periodOver) { r.clock.running = false; r.clock.baseMs = 0; }
+      ref.update(timingUpdate(r)).then(function () { pending = false; }, function () { pending = false; });
+    }
+  }, 100);
+})();
+</script>
+</body>
+</html>
